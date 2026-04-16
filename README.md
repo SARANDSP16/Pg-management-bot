@@ -1,5 +1,3 @@
-# PG Management AI Assistant — Complete Interview Guide
-
 ## 🧠 One-Line Summary
 > A **Telegram-based AI assistant** for PG (Paying Guest) hostel management that handles resident admissions, rent payments, checkouts, and operational logs using a **LangGraph intent router + Groq LLM + MongoDB** backend — all through natural language chat.
 
@@ -178,12 +176,6 @@ db.rooms.update_one(
 
 ---
 
-## 🧮 Refund Calculation at Checkout
-
-```
-Refund = Advance − (pending_rent + maintenance + damages)
-       = max(0, result)   # never negative
-```
 
 Example:
 - Advance: ₹10,000
@@ -191,45 +183,6 @@ Example:
 - Maintenance: ₹500
 - Damages: ₹0
 - **Refund: ₹7,500** ✅
-
----
-
-## ⚠️ Bugs Fixed
-
-| # | File | Bug | Fix Applied |
-|---|---|---|---|
-| 1 | `bot.py` | Duplicate import of `Update, InlineKeyboardMarkup` (line 19 & 70) | Removed duplicate import |
-| 2 | `bot.py` | Dead comment `# ... inside handle_message ...` left in module scope | Removed stray comment |
-| 3 | `bot.py` | `ensure_indexes()` never called in `post_init` | Added `await ensure_indexes()` call |
-| 4 | `db/connection.py` | `ensure_indexes()` is defined but never called during startup | Called from `post_init` now |
-| 5 | `requirements.txt` | `fastapi`, `uvicorn`, `jinja2`, `python-multipart` are unused (FastAPI server removed) | Cleaned up unused deps |
-| 6 | `intent/router.py` | `classify_intent_groq()` is synchronous `requests.post` called inside async graph — blocks event loop | Converted to `asyncio.to_thread` wrapper |
-| 7 | `handlers/payment.py` | `Confidence.HIGH` path passes `amount=None` to `record_payment` when only name was found but no amount | Guard added before HIGH path |
-| 8 | `utils/formatters.py` | `fmt_admission_sent()` references `form_url` but is never called (dead code from old FastAPI flow) | Removed unused function |
-| 9 | `bot.py` | `_handle_pending_state` for `"awaiting": "pick_resident_for_checkout"` calls `_build_confirm_prompt` which returns `CheckoutResult` but `result.pending_state` could be `None` causing unhandled assignment | Added null-safe `or {}` |
-| 10 | `intent/entities.py` | `fuzzywuzzy` import may warn about C extension; `python-Levenshtein` already in requirements but `fuzzywuzzy` should use `from rapidfuzz` | Noted in requirements (not breaking) |
-
----
-
-## 🎤 Common Interview Questions
-
-**Q: Why use MongoDB instead of PostgreSQL?**
-> Resident data is semi-structured (not all residents have damages, some have different fields), MongoDB's flexible schema fits naturally. Also, Motor provides first-class async support for Python's asyncio.
-
-**Q: Why LangGraph instead of just if/elif?**
-> LangGraph gives us a typed, composable, and extensible graph. Adding a new use case is just adding a node. It also handles async execution natively and is auditable (you can trace state through each node).
-
-**Q: How do you prevent duplicate payments?**
-> SHA-256 fingerprint based on `(resident_id, amount, date)`. Before every insert, we query the fingerprint index. If it exists, we raise `ValueError("DUPLICATE")` and return a user-friendly message.
-
-**Q: What happens if the Groq API is down?**
-> The keyword fast path handles most real-world messages. The LLM fallback is only needed for complex or ambiguous messages. If Groq fails, `classify_intent_groq()` catches all exceptions and returns `"NOISE"` as safe default.
-
-**Q: How is the checkout safe from accidental execution?**
-> Even at `Confidence.HIGH`, checkout always shows an InlineKeyboardMarkup with Confirm/Cancel buttons. The database write only happens on the `checkout_confirm:` callback — a two-step confirmation.
-
-**Q: How do you handle typos in names?**
-> FuzzyWuzzy (Levenshtein distance) with a threshold of score ≥ 70. If multiple residents match above threshold, the bot asks the user to pick from a numbered list (multi-turn MEDIUM confidence flow).
 
 ---
 
